@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link media="screen" rel="stylesheet" type="text/css" href="css/jquery-ui/smoothness/jquery-ui.custom.css" />
+    <link media="screen" rel="stylesheet" type="text/css" href="css/defaultUI.css" />
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/jquery-ui.custom.min.js"></script>
+    <script type="text/javascript" src="js/jquery.ba-resize.min.js"></script>
+    <script type="text/javascript" src="js/jquery.ui.touch-punch.min.js"></script>
+    <script type="text/javascript" src="js/VideoTimeControls.js"></script>
+    <script>
+      var videoTimeControls;
+      function unpackVars(str) {
+        var vars = {};
+        if (str) {
+          var keyvals = str.split('&');
+          for (var i = 0; i < keyvals.length; i++) {
+            var keyval = keyvals[i].split('=');
+            vars[keyval[0]] = keyval[1];
+          }
+        }
+        return vars;
+      }
+      $(function() {
+        hashVars = unpackVars(window.location.hash.slice(1));
+        $.ajax({
+          dataType: "json",
+          url: "http://tiles.cmucreatelab.org/ecam/timemachines/" + hashVars.cameraId + "/" + hashVars.cameraId + ".final.json",
+          success: function(data) {
+            videoTimeControls = new VideoTimeControls({
+              videoId: "video0",
+              captureTimes: data['capture-times'],
+              sliderColor: "red"
+            });
+          }
+        });
+      });
+    </script>
+  </head>
+  <body style="overflow: hidden; background: black;">
+    <video id="video0" muted preload playsinline autoplay loop src="0.mp4"></video>
+  </body>
+</html>
