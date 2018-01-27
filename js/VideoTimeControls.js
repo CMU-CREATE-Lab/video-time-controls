@@ -31,6 +31,8 @@ var VideoTimeControls = function (config) {
 
   this.video_ = $("#" + this.videoId_)[0];
 
+  this.$videoContainer_ = $("<div>", {id: this.id_});
+
   this.playOnLoad_ = config.playOnLoad || this.video_.autoplay || true;
 
   this.loop_ = config.loop || this.video_.loop || true;
@@ -213,12 +215,12 @@ VideoTimeControls.prototype.setInitialTimelineUIState_ = function() {
  * @private
  */
 VideoTimeControls.prototype.render_ = function() {
-  var $div = $("<div>", {id: this.id_});
-  $div.insertBefore($(this.video_));
+  this.$videoContainer_.insertBefore($(this.video_));
   document.getElementById(this.id_).innerHTML = this.template_;
-  $(this.video_).prependTo($div);
-  $div.css({
-    "position" : "relative"
+  $(this.video_).prependTo(this.$videoContainer_);
+  this.$videoContainer_.css({
+    "position" : "relative",
+    "background" : "black"
   });
 
   // Chromium bug (https://bugs.chromium.org/p/chromium/issues/detail?id=382879)
@@ -527,7 +529,7 @@ VideoTimeControls.prototype.initUI_ = function() {
  * @private
  */
 VideoTimeControls.prototype.handleFullScreen_ = function() {
-  var video = this.video_;
+  var videoContainer = this.$videoContainer_[0];
   if (this.isFullScreenAPISupported_()) {
     if (this.isFullScreen_) {
       if (document.exitFullscreen) {
@@ -542,14 +544,14 @@ VideoTimeControls.prototype.handleFullScreen_ = function() {
         document.webkitCancelFullScreen();
       }
     } else {
-      if (video.requestFullscreen) {
-        video.requestFullscreen();
-      } else if (video.msRequestFullscreen) {
-        video.msRequestFullscreen();
-      } else if (video.mozRequestFullScreen) {
-        video.mozRequestFullScreen();
-      } else if (video.webkitRequestFullScreen) {
-        video.webkitRequestFullScreen();
+      if (videoContainer.requestFullscreen) {
+        videoContainer.requestFullscreen();
+      } else if (videoContainer.msRequestFullscreen) {
+        videoContainer.msRequestFullscreen();
+      } else if (videoContainer.mozRequestFullScreen) {
+        videoContainer.mozRequestFullScreen();
+      } else if (videoContainer.webkitRequestFullScreen) {
+        videoContainer.webkitRequestFullScreen();
       }
     }
   } else {
