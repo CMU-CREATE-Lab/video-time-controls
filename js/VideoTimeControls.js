@@ -33,7 +33,7 @@ var VideoTimeControls = function (config) {
 
   this.$videoContainer_ = $("<div>", {id: this.id_});
 
-  this.playOnLoad_ = config.playOnLoad || this.video_.autoplay || true;
+  this.playOnLoad_ = typeof(config.playOnLoad) != "undefined" ? config.playOnLoad : true;
 
   this.loop_ = config.loop || this.video_.loop || true;
 

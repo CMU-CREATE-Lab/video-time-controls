@@ -10,25 +10,15 @@
     <script type="text/javascript" src="js/VideoTimeControls.js"></script>
     <script>
       var videoTimeControls;
-      function unpackVars(str) {
-        var vars = {};
-        if (str) {
-          var keyvals = str.split('&');
-          for (var i = 0; i < keyvals.length; i++) {
-            var keyval = keyvals[i].split('=');
-            vars[keyval[0]] = keyval[1];
-          }
-        }
-        return vars;
-      }
       $(function() {
-        hashVars = unpackVars(window.location.hash.slice(1));
         $.ajax({
           dataType: "json",
-          url: "http://tiles.cmucreatelab.org/ecam/timemachines/" + hashVars.cameraId + "/" + hashVars.cameraId + ".final.json",
+          url: "http://tiles.cmucreatelab.org/ecam/timemachines/golfcourse2/golfcourse2.final.json",
           success: function(data) {
             videoTimeControls = new VideoTimeControls({
               videoId: "video0",
+              videoFps: 12,
+              playOnLoad: true,
               captureTimes: data['capture-times'],
               sliderColor: "red"
             });
@@ -37,7 +27,7 @@
       });
     </script>
   </head>
-  <body style="overflow: hidden; background: black;">
-    <video id="video0" muted preload playsinline autoplay loop src="0.mp4"></video>
+  <body style="overflow: hidden;">
+    <video id="video0" muted preload playsinline loop src="0.mp4"></video>
   </body>
 </html>
