@@ -156,6 +156,19 @@ body, html {
   font-size: 11px;
 }
 
+.max-size {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.fullScreen.noTimestamps.noSpeedControls {
+  bottom: 66px;
+}
+
 .ui-button.ui-state-hover .ui-icon.ui-icon-custom-fullScreenOn, .ui-button.ui-state-hover .ui-icon.ui-icon-custom-fullScreenOff {
   opacity: 0.8;
 }
@@ -348,6 +361,10 @@ _:-moz-tree-row(hover), .helpPlayerLabel .ui-button-text {
   z-index: 10;
 }
 
+.captureTime.noSpeedControls {
+  left: 90px;
+}
+
 .playbackButton.ui-button {
   display: block;
   position: absolute;
@@ -372,6 +389,10 @@ _:-moz-tree-row(hover), .helpPlayerLabel .ui-button-text {
   box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.3);
   border: 1px solid #656565;
   background: transparent;
+}
+
+.timelineSliderFiller.noTimestamps.noSpeedControls {
+  bottom: 38px;
 }
 
 .timelineSlider {
@@ -631,6 +652,11 @@ _:-moz-tree-row(hover), .helpPlayerLabel .ui-button-text {
             user-select: none; /* Non-prefixed version, currently
                                   supported by Chrome and Opera */
   -webkit-tap-highlight-color: transparent;
+}
+
+.video-time-slider-controls-container {
+  height: 100%;
+  width: 100%;
 }
 
 .customDialog {

@@ -31,19 +31,19 @@ var VideoTimeControls = function (config) {
 
   this.video_ = $("#" + this.videoId_)[0];
 
-  this.$videoContainer_ = $("<div>", {id: this.id_});
+  this.$videoContainer_ = $("<div>", {id: this.id_, class: "video-time-slider-controls-container"});
 
   this.playOnLoad_ = typeof(config.playOnLoad) != "undefined" ? config.playOnLoad : true;
 
   this.loop_ = config.loop || this.video_.loop || true;
-
-  this.video_.autoplay = this.playOnLoad_;
 
   this.video_.loop = this.loop_;
 
   this.loadedUI_ = false;
 
   this.captureTimes_ = config.captureTimes;
+
+  this.startTimeInMs_ = config.startTimeInMs;
 
   this.requestAnimationFrameId_ = null;
 
@@ -55,6 +55,20 @@ var VideoTimeControls = function (config) {
 
   this.preFullScreenProperties_ = {};
 
+  this.lastVideoTime_ = 0;
+
+  this.lastCaptureTimeStr_ = "";
+
+  this.keysDown_ = [];
+
+  this.$captureTimeElm_ = "";
+
+  this.showTimestamps_ = typeof(config.showTimestamps) != "undefined" ? config.showTimestamps : true;
+
+  this.showSpeedControls_ = typeof(config.showSpeedControls) != "undefined" ? config.showSpeedControls : true;
+
+  this.showFullscreenControls_ = typeof(config.showFullscreenControls) != "undefined" ? config.showFullscreenControls : true;
+
   this.isMobileDevice_ = !(navigator.userAgent.match(/CrOS/) != null) &&
     (navigator.userAgent.match(/Android/i) ||
      navigator.userAgent.match(/webOS/i) || navigator.userAgent.match(/iPhone/i) ||
@@ -64,25 +78,60 @@ var VideoTimeControls = function (config) {
      navigator.userAgent.match(/Windows Phone/i) ||
      navigator.userAgent.match(/Mobile/i)) != null;
 
-  this.template_ = '\
-    <div class="controls" style="display: none"> \
-      <div class="captureTime" title="Capture time"> \
+  this.template_ = '<div class="controls" style="display: none">';
+
+  if (this.showTimestamps_) {
+    this.template_ += '\
+      <div id="captureTimeContainer" class="captureTime" title="Capture time"> \
         <div class="currentCaptureTime"><div class="captureTimeMain"><div id="currentTime"></div></div></div> \
-      </div> \
-      <div class="timelineSliderFiller"> \
+      </div>';
+  }
+
+  this.template_ += '\
+      <div id="timelineSliderContainer" class="timelineSliderFiller"> \
         <div id="Tslider1" class="timelineSlider"></div> \
-      </div> \
-      <div title="Toggle full screen" class="fullScreen"></div> \
-      <div title="Play" class="playbackButton"></div> \
+      </div>';
+
+  if (this.showFullscreenControls_) {
+    this.template_ += '<div title="Toggle full screen" id="fullScreenContainer" class="fullScreen"></div>';
+  }
+
+  this.template_ += '<div title="Play" class="playbackButton"></div>';
+
+  if (this.showSpeedControls_) {
+    this.template_ += '\
       <button class="toggleSpeed" id="fastSpeed" title="Toggle playback speed">Fast</button> \
       <button class="toggleSpeed" id="mediumSpeed" title="Toggle playback speed">Medium</button> \
-      <button class="toggleSpeed" id="slowSpeed" title="Toggle playback speed">Slow</button> \
-    </div>';
+      <button class="toggleSpeed" id="slowSpeed" title="Toggle playback speed">Slow</button>';
+  }
+
+  this.template_ += '</div>';
 
   // Add the template to the DOM
   this.render_();
 
+  if (!this.showSpeedControls_ && !this.showTimestamps_) {
+    $("#" + this.id_ + " #timelineSliderContainer, " + "#" + this.id_ + " #fullScreenContainer").addClass("noTimestamps noSpeedControls");
+  } else if (!this.showSpeedControls_ && this.showTimestamps_) {
+    $("#" + this.id_ + " #captureTimeContainer").addClass("noSpeedControls");
+  }
+
   this.initEvents_();
+
+  // For the case where 'loadeddata' didn't fire because the listener was added too late
+  if (!this.loadedUI_ && this.video_.readyState > 2) {
+    this.onFirstLoad_();
+  }
+};
+
+
+/**
+ * Sets to a new array of capture time string
+ * @public
+ * @param {newCaptureTimes} Array of strings
+ */
+VideoTimeControls.prototype.setCaptureTimes = function(newCaptureTimes) {
+  this.captureTimes_ = newCaptureTimes;
 };
 
 
@@ -122,7 +171,7 @@ VideoTimeControls.prototype.getFps = function() {
  * @returns {number}
  */
 VideoTimeControls.prototype.getNumFrames = function() {
-  return this.getDuration() * this.getFps();
+  return Math.ceil(this.getDuration() * this.getFps());
 };
 
 
@@ -155,11 +204,10 @@ VideoTimeControls.prototype.loadNewVideo = function(config) {
   this.video_.src = config.videoSrc;
   this.fps_ = config.videoFps || this.fps_;
 
-  $(".timelineSlider").slider("value", 0);
+  $("#" + this.id_ + " #timelineSliderContainer .timelineSlider").slider("value", 0);
 
   if (typeof(config.playOnLoad) !== undefined) {
     this.playOnLoad_ = config.playOnLoad;
-    this.video_.autoplay = this.playOnLoad_;
   }
 
   if (typeof(config.loop) !== undefined) {
@@ -176,20 +224,11 @@ VideoTimeControls.prototype.loadNewVideo = function(config) {
 
 
 /**
- * Pause the video
+ * Play/Pause the video
  * @public
  */
-VideoTimeControls.prototype.pause = function() {
-  $(".playbackButton").trigger("click");
-};
-
-
-/**
- * Start playing the video
- * @public
- */
-VideoTimeControls.prototype.play = function() {
-  $(".playbackButton").trigger("click");
+VideoTimeControls.prototype.togglePlayPause = function() {
+  $("#" + this.id_ + " .playbackButton").trigger("click");
 };
 
 
@@ -198,7 +237,7 @@ VideoTimeControls.prototype.play = function() {
  * @private
  */
 VideoTimeControls.prototype.setInitialTimelineUIState_ = function() {
-  var $playbackButton = $(".playbackButton");
+  var $playbackButton = $("#" + this.id_ + " .playbackButton");
 
   if (this.playOnLoad_) {
     $playbackButton.removeClass("play").addClass("pause").attr("title", "Pause");
@@ -218,8 +257,9 @@ VideoTimeControls.prototype.render_ = function() {
   this.$videoContainer_.insertBefore($(this.video_));
   document.getElementById(this.id_).innerHTML = this.template_;
   $(this.video_).prependTo(this.$videoContainer_);
+  this.$captureTimeElm_ = $("#" + this.id_ + " #currentTime");
   this.$videoContainer_.css({
-    "position" : "relative",
+    "position" : "absolute",
     "background" : "black"
   });
 
@@ -231,6 +271,22 @@ VideoTimeControls.prototype.render_ = function() {
 };
 
 
+VideoTimeControls.prototype.onFirstLoad_ = function() {
+  if (!this.loadedUI_) {
+    this.initUI_();
+  }
+  if (this.playOnLoad_ && this.video_.paused) {
+    if ($("#" + this.id_ + " .playbackButton").hasClass("pause")) {
+      this.video_.play();
+    } else {
+      this.togglePlayPause();
+    }
+  }
+  $(this.video_).trigger("resize");
+  this.requestUpdateFunction_();
+};
+
+
 /**
  * Setup DOM events
  * @private
@@ -239,51 +295,69 @@ VideoTimeControls.prototype.initEvents_ = function() {
   var that = this;
 
   $(window).on("resize", function() {
-    if (that.isFillScreen_ || $(that.video_).hasClass("max-size")) {
+    if (that.isFillScreen_) {
       $(that.video_).css({
         "width" : $(window).width(),
-        "height" : $(window).height()
+        "height" : $(window).height() - $("#" + that.id_ + " .controls").outerHeight(),
       });
     }
   });
 
   $(that.video_).on("resize", function() {
-    $(".controls").css({
+    $("#" + that.id_ + " .controls").css({
       "width" : $(that.video_).width() + "px"
-    });
-    $(".controls").show();
+    }).show();
+  }).on("loadeddata", function() {
+    that.onFirstLoad_();
+  }).on("click", function() {
+    $("#" + that.id_ + " .playbackButton").trigger("click");
   });
 
-  $(that.video_).on("loadeddata", function() {
-    if (!that.loadedUI_) {
-      that.initUI_();
+  $(document).on("keydown", function(e) {
+    switch(e.keyCode) {
+      // Play/pause on space bar
+      case 32:
+        that.togglePlayPause();
+        break;
+      // Left/Right arrows
+      case 37:
+      case 39:
+        $("#" + that.id_ + " .ui-slider-handle").trigger("focus");
+        break;
+      // 'a' key
+      case 65:
+        if (!that.video_.paused) {
+          $("#" + that.id_ + " .playbackButton").trigger("click");
+        }
+        that.video_.currentTime = 0;
+        that.updateTimeControls_();
+        break;
+      // 's' key
+      case 83:
+        if (!that.video_.paused) {
+          $("#" + that.id_ + " .playbackButton").trigger("click");
+        }
+        that.video_.currentTime = that.video_.duration;
+        that.updateTimeControls_();
+        break;
     }
-    if (that.playOnLoad_ && that.video_.paused) {
-      that.video_.play();
-    }
-    $(that.video_).trigger("resize");
-    that.requestUpdateFunction_();
-  });
-
-  document.addEventListener("keydown", function(event) {
-    // Play/pause on space bar
-    if (event.keyCode == 32 ) {
-      $(".playbackButton").trigger("click");
-    }
+    that.keysDown_.push(e.keyCode);
+  }).on("keyup", function(e) {
+    that.keysDown_.length = 0;
   });
 
   $(document).on('webkitfullscreenchange mozfullscreenchange fullscreenchange MSFullscreenChange', function() {
     that.isFullScreen_ = !that.isFullScreen_;
     if (that.isFullScreen_ && !that.isMobileDevice_) {
-      $(".controls").css({
+      $("#" + that.id_ + " .controls").css({
         "zIndex" : 2147483647,
       });
     } else {
-      $(".controls").css({
+      $("#" + that.id_ + " .controls").css({
         "zIndex" : 10,
       });
     }
-    $("#" + that.id_ + " .fullScreen").button({
+    $("#" + that.id_ + " #fullScreenContainer").button({
       icons: {
         primary: that.isFullScreen_ ? "ui-icon-custom-fullScreenOff" : "ui-icon-custom-fullScreenOn"
       }
@@ -299,10 +373,15 @@ VideoTimeControls.prototype.initEvents_ = function() {
  */
 VideoTimeControls.prototype.requestUpdateFunction_ = function() {
   if (!this.video_.paused) {
-    $(".timelineSlider").slider("value", this.video_.currentTime * this.getFps());
-    this.renderCurrentTime_();
+    this.updateTimeControls_();
   }
   this.requestAnimationFrameId_ = this.requestAnimFrame_.call(window, this.requestUpdateFunction_.bind(this));
+};
+
+
+VideoTimeControls.prototype.updateTimeControls_ = function() {
+  $("#" + this.id_ + " #timelineSliderContainer .timelineSlider").slider("value", Math.ceil(this.video_.currentTime * this.getFps() - 0.1));
+  this.renderCurrentTime_();
 };
 
 
@@ -311,7 +390,7 @@ VideoTimeControls.prototype.requestUpdateFunction_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initPlaybackButton_ = function() {
-  var $playbackButton = $(".playbackButton");
+  var $playbackButton = $("#" + this.id_ + " .playbackButton");
   var that = this;
 
   $playbackButton.button({
@@ -343,7 +422,7 @@ VideoTimeControls.prototype.initPlaybackButton_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initFullScreenButton_ = function() {
-  var $fullScreenButton = $(".fullScreen");
+  var $fullScreenButton = $("#" + this.id_ + " #fullScreenContainer");
   var that = this;
 
   $fullScreenButton.button({
@@ -362,9 +441,9 @@ VideoTimeControls.prototype.initFullScreenButton_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initFastSpeedButton_ = function() {
-  var $fastSpeedButton = $("#fastSpeed");
-  var $mediumSpeedButton = $("#mediumSpeed");
-  var $controls = $(".controls");
+  var $fastSpeedButton = $("#" + this.id_ + " #fastSpeed");
+  var $mediumSpeedButton = $("#" + this.id_ + " #mediumSpeed");
+  var $controls = $("#" + this.id_ + " .controls");
   var that = this;
 
   $fastSpeedButton.button({
@@ -384,9 +463,9 @@ VideoTimeControls.prototype.initFastSpeedButton_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initMediumSpeedButton_ = function() {
-  var $mediumSpeedButton = $("#mediumSpeed");
-  var $slowSpeedButton = $("#slowSpeed");
-  var $controls = $(".controls");
+  var $mediumSpeedButton = $("#" + this.id_ + " #mediumSpeed");
+  var $slowSpeedButton = $("#" + this.id_ + " #slowSpeed");
+  var $controls = $("#" + this.id_ + " .controls");
   var that = this;
 
   $mediumSpeedButton.button({
@@ -405,9 +484,9 @@ VideoTimeControls.prototype.initMediumSpeedButton_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initSlowSpeedButton_ = function() {
-  var $slowSpeedButton = $("#slowSpeed");
-  var $fastSpeedButton = $("#fastSpeed");
-  var $controls = $(".controls");
+  var $slowSpeedButton = $("#" + this.id_ + " #slowSpeed");
+  var $fastSpeedButton = $("#" + this.id_ + " #fastSpeed");
+  var $controls = $("#" + this.id_ + " .controls");
   var that = this;
 
   $slowSpeedButton.button({
@@ -426,7 +505,7 @@ VideoTimeControls.prototype.initSlowSpeedButton_ = function() {
  * @private
  */
 VideoTimeControls.prototype.initTimelineSlider_ = function() {
-  var $timelineSlider = $(".timelineSlider");
+  var $timelineSlider = $("#" + this.id_ + " #timelineSliderContainer .timelineSlider");
   var that = this;
   $timelineSlider.slider({
     min: 0,
@@ -434,7 +513,7 @@ VideoTimeControls.prototype.initTimelineSlider_ = function() {
     range: "min",
     step: 1,
     slide: function(e, ui) {
-      var newTime = ui.value / that.getFps();
+      var newTime = ((ui.value + 0.1) / that.getFps());
       that.video_.currentTime = newTime;
       that.renderCurrentTime_();
     },
@@ -451,7 +530,40 @@ VideoTimeControls.prototype.initTimelineSlider_ = function() {
       }
     }
   }).removeClass("ui-corner-all").children().removeClass("ui-corner-all");
-  $(".timelineSlider .ui-slider-handle").attr("title", "Drag to go to a different point in time");
+  $("#" + this.id_ + " #timelineSliderContainer .timelineSlider .ui-slider-handle").attr("title", "Drag to go to a different point in time");
+};
+
+
+VideoTimeControls.prototype.getCurrentCaptureTime = function() {
+  var currentVideoTime = this.video_.currentTime;
+
+  if (currentVideoTime == this.lastVideoTime_) return "";
+
+  this.lastVideoTime_ = currentVideoTime;
+
+  if (this.captureTimes_ && this.captureTimes_.length) {
+    var currentCaptureTimeIdx = $("#" + this.id_ + " #timelineSliderContainer .timelineSlider").slider("value");
+    var newCaptureTime = this.captureTimes_[currentCaptureTimeIdx];
+    if (this.lastCaptureTimeStr_ == newCaptureTime) {
+      return "";
+    }
+    this.lastCaptureTimeStr_ = newCaptureTime;
+    return newCaptureTime;
+  }
+
+  // If capture times were not passed in, compute time steps based on start time
+  // passed in from config.
+
+  var u = currentVideoTime / this.video_.duration;
+  // 24 * 60 * 60 * 10000
+  var timeOffset = 86400000 * u;
+  var timeInSec = Math.ceil(this.startTimeInMs_ + timeOffset);
+  var currentTimeStr = moment(timeInSec).format("MMM DD, YYYY hh:mm A");
+  if (this.lastCaptureTimeStr_ == currentTimeStr) {
+    return "";
+  }
+  this.lastCaptureTimeStr_ = currentTimeStr;
+  return currentTimeStr;
 };
 
 
@@ -460,8 +572,12 @@ VideoTimeControls.prototype.initTimelineSlider_ = function() {
  * @private
  */
 VideoTimeControls.prototype.renderCurrentTime_ = function() {
-  var currentCaptureTimeIdx = $(".timelineSlider").slider("value");
-  $("#currentTime").html(this.captureTimes_[currentCaptureTimeIdx]);
+  if (!this.showTimestamps_) return;
+
+  var captureTimeStr = this.getCurrentCaptureTime();
+  if (captureTimeStr) {
+    this.$captureTimeElm_.html(captureTimeStr);
+  }
 };
 
 
@@ -480,38 +596,38 @@ VideoTimeControls.prototype.initUI_ = function() {
   this.renderCurrentTime_();
   this.setInitialTimelineUIState_();
 
-  $(".toggleSpeed .ui-button-text").css("padding", "1px");
+  $("#" + this.id_ + " .toggleSpeed .ui-button-text").css("padding", "1px");
 
   if (!this.video_.style.width && !this.video_.style.height && !this.video_.getAttribute("width") && !this.video_.getAttribute("height")) {
     $(this.video_).addClass("max-size");
   }
 
-  $(".timelineSlider .ui-slider-range").css("background", this.sliderColor_);
+  $("#" + this.id_ + " #timelineSliderContainer .timelineSlider .ui-slider-range").css("background", this.sliderColor_);
 
   if (this.isMobileDevice_) {
-    $(".timelineSlider").css("height", "21px");
+    $("#" + this.id_ + " #timelineSliderContainer .timelineSlider").css("height", "21px");
 
-    $(".timelineSlider .ui-slider-handle").css({
+    $("#" + this.id_ + " #timelineSliderContainer .timelineSlider .ui-slider-handle").css({
       "width" : "30px",
       "height" : "29px"
     });
 
-    $(".timelineSliderFiller, .toggleSpeed").css({
+    $("#" + this.id_ + " #timelineSliderContainer .timelineSliderFiller, .toggleSpeed").css({
       "left" : "104px"
     });
 
-    $(".captureTime").css({
+    $("#" + this.id_ + " #captureTimeContainer").css({
       "left" : "176px",
       "font-size" : "21px",
       "bottom" : "15px"
     });
 
-    $(".playbackButton.ui-button").css({
+    $("#" + this.id_ + " .playbackButton.ui-button").css({
       "width" : "60px",
       "height" : "60px"
     });
 
-    $(".toggleSpeed.ui-button").css({
+    $("#" + this.id_ + " .toggleSpeed.ui-button").css({
       "width" : "60px",
       "height" : "30px",
       "bottom" : "10px"

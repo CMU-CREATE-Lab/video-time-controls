@@ -8,22 +8,30 @@
     <script type="text/javascript" src="js/jquery.ba-resize.min.js"></script>
     <script type="text/javascript" src="js/jquery.ui.touch-punch.min.js"></script>
     <script type="text/javascript" src="js/VideoTimeControls.js"></script>
+    <script type="text/javascript" src="https://momentjs.com/downloads/moment.min.js"></script>
+    <script type="text/javascript" src="https://momentjs.com/downloads/moment-timezone-with-data-10-year-range.min.js"></script>
+
     <script>
       var videoTimeControls;
+      //var dateStr = "2020-12-11";
+      //var videoDate = moment.tz(dateStr, "America/New_York").subtract(3, "hours").toDate();
+      //var dateInMs = videoDate.getTime();
+
       $(function() {
-        $.ajax({
-          dataType: "json",
-          url: "http://tiles.cmucreatelab.org/ecam/timemachines/golfcourse2/golfcourse2.final.json",
-          success: function(data) {
+      //  $.ajax({
+      //    dataType: "json",
+      //    url: "",
+      //    success: function(data) {
             videoTimeControls = new VideoTimeControls({
               videoId: "video0",
-              videoFps: 12,
+              videoFps: 30,
               playOnLoad: true,
-              captureTimes: data['capture-times'],
-              sliderColor: "red"
+              captureTimes: ["DATE AND TIME HERE"],
+              sliderColor: "red",
+              /*startTimeInMs: dateInMs*/
             });
-          }
-        });
+      //    }
+      //  }
       });
     </script>
   </head>
